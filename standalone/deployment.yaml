@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: redis7
+  name: redis7
+  namespace: soft
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis7
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: redis7
+    spec:
+      containers:
+        - command:
+            - redis-server
+            - /etc/redis/redis.conf
+          image: registry.cn-beijing.aliyuncs.com/alphesh-soft/redis:7.0.1
+          imagePullPolicy: Always
+          livenessProbe:
+            exec:
+              command:
+                - redis-cli
+                - ping
+            failureThreshold: 3
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 5
+          name: redis
+          ports:
+            - containerPort: 6379
+              name: api
+              protocol: TCP
+          readinessProbe:
+            exec:
+              command:
+                - redis-cli
+                - ping
+            failureThreshold: 3
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          volumeMounts:
+            - mountPath: /etc/redis/redis.conf
+              name: redis7-config
+              readOnly: true
+              subPath: redis.conf
+            - mountPath: /etc/redis/users.acl
+              name: redis7-acl
+              readOnly: true
+              subPath: user.acl
+      imagePullSecrets:
+        - name: aliyun-registry
+      restartPolicy: Always
+      volumes:
+        - configMap:
+            defaultMode: 420
+            name: redis7
+          name: redis7-config
+        - secret:
+            defaultMode: 420
+            secretName: redis-acl
+          name: redis7-acl

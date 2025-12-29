@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: redis-acl
+  namespace: soft
+type: Opaque
+stringData:
+  user.acl: |
+    user default on >MySuperStrongPassword123 ~* +@all
+    user cluster-node on >cluster_password ~* &* +@all
+    user readonly_user on >guest_pass ~* &* -@all +get
