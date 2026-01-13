@@ -1,54 +1,72 @@
 apiVersion: v1
-data:
-  redis.conf: |
-    bind 0.0.0.0
-    protected-mode yes
-    port 6379
-    tcp-backlog 511
-    timeout 0
-    tcp-keepalive 300
-    daemonize no
-    pidfile /var/run/redis_6379.pid
-    loglevel notice
-    logfile ""
-    databases 16
-    set-proc-title yes
-    proc-title-template "{title} {listen-addr} {server-mode}"
-    stop-writes-on-bgsave-error yes
-    rdbcompression yes
-    rdbchecksum yes
-    dbfilename dump.rdb
-    rdb-del-sync-files no
-    dir ./
-    replica-serve-stale-data yes
-    replica-read-only yes
-    repl-diskless-sync no
-    repl-diskless-sync-delay 5
-    repl-diskless-load disabled
-    repl-disable-tcp-nodelay no
-    replica-priority 100
-    acllog-max-len 128
-    requirepass alphesh-ts
-    lazyfree-lazy-eviction no
-    lazyfree-lazy-expire no
-    lazyfree-lazy-server-del no
-    replica-lazy-flush no
-    lazyfree-lazy-user-del no
-    lazyfree-lazy-user-flush no
-    appendonly no
-    appendfilename "appendonly.aof"
-    appendfsync everysec
-    no-appendfsync-on-rewrite no
-    auto-aof-rewrite-percentage 100
-    auto-aof-rewrite-min-size 64mb
-    aof-load-truncated yes
-    aof-use-rdb-preamble yes
-    lua-time-limit 5000
-    disable-thp yes
-    aclfile /etc/redis/users.acl
 kind: ConfigMap
 metadata:
-  labels:
-    app: redis7
-  name: redis7
-  namespace: soft
+  name: redis-config
+  namespace: soft-dev
+data:
+  redis.conf: |
+    # ================= 网络设置 =================
+    bind 0.0.0.0
+    port 6379
+    # 关闭保护模式，因为我们通过 K8s 网络策略和 ACL 鉴权，且 bind 了 0.0.0.0
+    protected-mode no
+    # TCP Keepalive，每 300 秒检测一次死连接，防止网络僵死
+    tcp-keepalive 300
+
+    # ================= 通用设置 =================
+    # 容器化部署必须设置为 no，让进程在前台运行，否则 Pod 会启动失败
+    daemonize no
+    loglevel notice
+    logfile "" 
+    # (设置为 "" 表示输出到标准输出，方便 kubectl logs 查看)
+
+    # ================= 内存管理 (核心稳定性配置) =================
+    # ⚠️ 重要：设置为 Pod 内存 Limit 的 70%-80%。
+    # 之前的 yaml 设置了 limit: 512Mi，这里建议留出 100M 给系统开销
+    maxmemory 400mb
+
+    # 内存驱逐策略：
+    # allkeys-lru: 内存满时，删除最少使用的 key (适合当缓存用)
+    # noeviction: 内存满时，写入报错但不会删除数据 (适合当纯数据库用，数据不能丢)
+    # 建议单节点做缓存或会话存储时使用 allkeys-lru
+    maxmemory-policy allkeys-lru
+
+    # ================= 持久化 (RDB + AOF) =================
+    # 1. RDB 快照 (适合备份和快速重启)
+    # 900秒内有1个改动，300秒内10个改动，60秒内10000个改动 -> 触发保存
+    save 900 1
+    save 300 10
+    save 60 10000
+    rdbcompression yes
+    dbfilename dump.rdb
+    dir /data
+
+    # 2. AOF (数据安全性更高)
+    # 开启 AOF
+    appendonly yes
+    appendfilename "appendonly.aof"
+    # 刷盘策略：everysec (每秒刷盘一次，兼顾性能和安全，最多丢1秒数据)
+    appendfsync everysec
+    # 重写 AOF 时暂停刷盘，避免 I/O 阻塞
+    no-appendfsync-on-rewrite no
+    # AOF 文件增长 100% (即翻倍) 时自动重写优化
+    auto-aof-rewrite-percentage 100
+    auto-aof-rewrite-min-size 64mb
+
+    # ================= 安全加固 =================
+    # 禁用高危命令 (防止开发误删数据或阻塞生产环境)
+    # 注意：如果你的健康检查脚本使用了 ping，不要禁用 ping
+    rename-command FLUSHALL ""
+    rename-command FLUSHDB ""
+    rename-command CONFIG ""
+    rename-command KEYS ""
+
+    # ================= 慢日志 =================
+    # 记录执行时间超过 10000 微秒 (10ms) 的命令
+    slowlog-log-slower-than 10000
+    # 最多记录 128 条
+    slowlog-max-len 128
+
+    # ================= 高级延迟监控 =================
+    latency-monitor-threshold 0
+    notify-keyspace-events ""

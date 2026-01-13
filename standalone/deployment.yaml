@@ -1,74 +1,84 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
-  labels:
-    app: redis7
-  name: redis7
-  namespace: soft
+  name: redis-standalone
+  namespace: soft-dev
 spec:
+  serviceName: "redis-svc"
   replicas: 1
   selector:
     matchLabels:
-      app: redis7
-  strategy:
-    rollingUpdate:
-      maxSurge: 25%
-      maxUnavailable: 25%
-    type: RollingUpdate
+      app: redis
   template:
     metadata:
       labels:
-        app: redis7
+        app: redis
     spec:
       containers:
-        - command:
-            - redis-server
-            - /etc/redis/redis.conf
+        - name: redis
           image: registry.cn-beijing.aliyuncs.com/alphesh-soft/redis:7.0.1
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - |
+              echo "user $REDIS_USER on >$REDIS_PASSWORD ~* +@all" > /tmp/users.acl && \
+              echo "user default off" >> /tmp/users.acl && \
+              redis-server /conf/redis.conf --aclfile /tmp/users.acl
+          env:
+            - name: REDIS_USER
+              valueFrom:
+                secretKeyRef:
+                  name: redis-secret
+                  key: username
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redis-secret
+                  key: password
+          ports:
+            - containerPort: 6379
+              name: redis
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: config
+              mountPath: /conf
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
           livenessProbe:
             exec:
               command:
-                - redis-cli
-                - ping
-            failureThreshold: 3
+                - sh
+                - -c
+                - "redis-cli --user $REDIS_USER -a $REDIS_PASSWORD ping"
             initialDelaySeconds: 30
             periodSeconds: 10
-            successThreshold: 1
-            timeoutSeconds: 5
-          name: redis
-          ports:
-            - containerPort: 6379
-              name: api
-              protocol: TCP
           readinessProbe:
             exec:
               command:
-                - redis-cli
-                - ping
-            failureThreshold: 3
+                - sh
+                - -c
+                - "redis-cli --user $REDIS_USER -a $REDIS_PASSWORD ping"
             initialDelaySeconds: 5
             periodSeconds: 10
-            successThreshold: 1
-            timeoutSeconds: 1
-          volumeMounts:
-            - mountPath: /etc/redis/redis.conf
-              name: redis7-config
-              readOnly: true
-              subPath: redis.conf
-            - mountPath: /etc/redis/users.acl
-              name: redis7-acl
-              readOnly: true
-              subPath: user.acl
+      volumes:
+        - name: config
+          configMap:
+            name: redis-config
       imagePullSecrets:
         - name: aliyun-registry
-      restartPolicy: Always
-      volumes:
-        - configMap:
-            defaultMode: 420
-            name: redis7
-          name: redis7-config
-        - secret:
-            defaultMode: 420
-            secretName: redis-acl
-          name: redis7-acl
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        storageClassName: "nfs-storage"
+        resources:
+          requests:
+            storage: 1Gi
