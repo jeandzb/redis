@@ -6,6 +6,5 @@ metadata:
 type: Opaque
 stringData:
   user.acl: |
-    user default on >MySuperStrongPassword123 ~* +@all
-    user cluster-node on >cluster_password ~* &* +@all
-    user readonly_user on >guest_pass ~* &* -@all +get
+    user default off
+    user alphesh on >alphesh-ts ~* &* +@all

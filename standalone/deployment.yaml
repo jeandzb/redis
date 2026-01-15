@@ -18,6 +18,7 @@ spec:
         - name: redis
           image: registry.cn-beijing.aliyuncs.com/alphesh-soft/redis:7.0.1
           imagePullPolicy: IfNotPresent
+          # 先根据变量写入acl，启动时加载acl
           command:
             - sh
             - -c
@@ -25,6 +26,7 @@ spec:
               echo "user $REDIS_USER on >$REDIS_PASSWORD ~* +@all" > /tmp/users.acl && \
               echo "user default off" >> /tmp/users.acl && \
               redis-server /conf/redis.conf --aclfile /tmp/users.acl
+          # acl由secret控制
           env:
             - name: REDIS_USER
               valueFrom:
