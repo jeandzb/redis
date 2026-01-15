@@ -23,7 +23,7 @@ spec:
             - sh
             - -c
             - |
-              echo "user $REDIS_USER on >$REDIS_PASSWORD ~* +@all" > /tmp/users.acl && \
+              echo "user $REDIS_USER on >$REDIS_PASSWORD ~* &* +@all" > /tmp/users.acl && \
               echo "user default off" >> /tmp/users.acl && \
               redis-server /conf/redis.conf --aclfile /tmp/users.acl
           # acl由secret控制
