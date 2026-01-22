@@ -59,7 +59,7 @@ data:
     rename-command FLUSHALL ""
     rename-command FLUSHDB ""
     rename-command CONFIG ""
-    rename-command KEYS ""
+
 
     # ================= 慢日志 =================
     # 记录执行时间超过 10000 微秒 (10ms) 的命令
