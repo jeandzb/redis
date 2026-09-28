@@ -46,6 +46,9 @@ requirepass <password>
 通过configmap或者secret的方式将aclfile挂载到pod中，并修改redis.conf，将aclfile指向挂载的目录。文件只读  
 不允许在业务中通过命令修改aclfile  
 
+方案3：
+通过command line，将aclfile挂载到pod中，并修改redis.conf，将aclfile指向挂载的目录。文件只读  
+
 ### 拓展：
 1. protected-mode  
 默认值：yes，当 Redis 认为自己处于不安全状态时，protected-mode 会触发保护机制，直接切断所有来自外部 IP 的连接。即使你配置了 bind 0.0.0.0  
